@@ -1,0 +1,198 @@
+<!doctype html>
+<html>
+  <head>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Edu+NSW+ACT+Cursive:wght@400..700&display=swap" rel="stylesheet">
+    <title>Happy birthday isaac!</title>
+    <style>
+      body, html {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background-color: black;
+      }
+      canvas {
+        display: block;
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 0;
+      }
+      h1, h4 {
+        position: fixed;
+        bottom: 50px;
+        width: 100%;
+        text-align: center;
+        color: white;
+        font-family: sans-serif;
+        z-index: 1;
+        margin: 0;
+        line-height: 1.4;
+        font-family: "Edu NSW ACT Cursive", cursive;
+      }
+      h1 + h4 { bottom: 0; }
+    </style>
+  </head>
+
+  <body>
+    <canvas></canvas>
+    <h1>Here's to a long life of prosperity and happiness ❤️</h1>
+    <h4>- Funmi, Abigail, Daniel, Joshua, Emmanuel </h4>
+
+    <script>
+      const random = (min, max) => min + Math.random() * (max - min);
+
+      function drawCircle(ctx, x, y, hue, alpha, radius) {
+        ctx.beginPath();
+        ctx.fillStyle = `hsla(${hue}, 100%, 50%, ${alpha})`;
+        ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+
+      class Particle {
+        constructor(x, y, golden) {
+          [this.speed, this.decay, this.lifetime] = [random(100, 200), 0.6, 1.0];
+          [this.x, this.y, this.angle] = [x, y, random(0, 2 * Math.PI)];
+          this.hue = golden ? random(41, 60) : random(0, 360);
+          this.dead = false;
+        }
+
+        scatter(deltaTime) {
+          this.x += Math.cos(this.angle) * this.speed * deltaTime;
+          this.y += Math.sin(this.angle) * this.speed * deltaTime;
+          this.lifetime -= this.decay * deltaTime;
+          this.dead = this.lifetime <= 0;
+        }
+
+        shootStraightUp(deltaTime, minHeight) {
+          this.y -= this.speed * deltaTime;
+          this.dead = this.y < minHeight;
+        }
+      }
+
+      function handleParticles(ctx, particles, deltaTime, updatePositions) {
+        if (updatePositions) {
+          for (let j = particles.length - 1; j >= 0; j--) {
+            particles[j].scatter(deltaTime);
+            if (particles[j].lifetime <= 0)
+              particles.splice(j, 1); // remove dead particles
+          }
+        }
+
+        for (const p of particles)
+          drawCircle(ctx, p.x, p.y, p.hue, p.lifetime.toFixed(2), 2);
+      }
+
+      class Firework {
+        constructor(x, y, height) {
+          this.trigger = new Particle(x, y, false);
+          this.trigger.speed = 500;
+          this.targetHeight = height;
+          this.particles = undefined;
+          this.dead = false;
+        }
+
+        update(ctx, deltaTime) {
+          if (!this.trigger.dead) {
+            this.trigger.shootStraightUp(deltaTime, this.targetHeight);
+            drawCircle(ctx, this.trigger.x, this.trigger.y, this.trigger.hue, 1, 5);
+            return;
+          }
+
+          if (this.particles === undefined) {
+            this.particles = [];
+            const amount = random(150, 200);
+            for (let i = 0; i < amount; i++) {
+              this.particles.push(new Particle(this.trigger.x, this.trigger.y, false));
+            }
+          }
+
+          handleParticles(ctx, this.particles, deltaTime, true);
+          this.dead = this.particles.length == 0;
+        }
+      }
+
+      // get sampled pixel positions from text that's temporarily drawn
+      function getTextPixelCoords(text, canvasWidth, canvasHeight) {
+        const canvas = document.createElement("canvas");
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+        const ctx = canvas.getContext("2d");
+
+        // draw centered
+        const height = 150;
+        ctx.fillStyle = "white";
+        ctx.textBaseline = "middle";
+        ctx.textAlign = "center";
+        ctx.font = `bold ${height}px Edu NSW ACT Cursive`;
+        ctx.fillText(text, canvasWidth/2, canvasHeight/2 - height/2);
+
+        const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        let [sampleCount, sampleInterval] = [0, 50];
+        let positions = [];
+
+        for (let y = 0; y < canvas.height; y++) {
+          for (let x = 0; x < canvas.width; x++) {
+            const index = (y * canvasWidth + x) * 4;
+            const isText = pixels[index + 3] > 0; // alpha is set
+            sampleCount++;
+            if (isText && sampleCount % sampleInterval == 0)
+              positions.push([x, y]);
+          }
+        }
+
+        canvas.remove();
+        return positions;
+      }
+
+      // make fullscreen
+      const canvas = document.getElementsByTagName("canvas")[0];
+      const ctx = canvas.getContext("2d");
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
+      ctx.scale(dpr, dpr);
+
+      let positions = getTextPixelCoords("Happy 50th birthday!", window.innerWidth, window.innerHeight);
+      let textParticles = positions.map((p) => new Particle(p[0], p[1], true));
+
+      let explodeTextParticles = false;
+      setTimeout(() => { explodeTextParticles = true; }, 1500);
+
+      let fireworks = [];
+      setInterval(() => {
+        if (textParticles.length > 0) return;
+        fireworks.push(new Firework(random(0, canvas.width), canvas.height - 25, random(75, canvas.height / 2)));
+      }, 500);
+
+      function update(deltaTime) {
+        const doneInitialExplosion = textParticles.length == 0;
+        if (!doneInitialExplosion) {
+          handleParticles(ctx, textParticles, deltaTime, explodeTextParticles);
+        } else {
+          for (let i = fireworks.length - 1; i >= 0; i--) {
+            fireworks[i].update(ctx, deltaTime);
+            if (fireworks[i].dead)
+              fireworks.splice(i, 1); // remove dead fireworks
+          }
+        }
+      }
+
+      let previousTime = 0;
+      function loop(currentTime) {
+        const deltaTime = (currentTime - previousTime) / 1000;
+        previousTime = currentTime;
+
+        // the slightly transparent background allows each particle's
+        // trail to be visible, like a shooting star
+        ctx.fillStyle = `rgba(0, 0, 0, 0.2)`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        update(deltaTime);
+
+        requestAnimationFrame(loop);
+      }
+      loop(0);
+    </script>
+  </body>
+</html>
