@@ -4,6 +4,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Edu+NSW+ACT+Cursive:wght@400..700&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Happy birthday isaac!</title>
     <style>
       body, html {
@@ -113,23 +114,34 @@
         }
       }
 
+      // get the largest font size that'll fit inside the target width
+      function getLargetFontSize(text, font, targetWidth) {
+        let size = targetWidth / 2;
+        while (true) {
+          ctx.font = `bold ${size}px ${font}`;
+          const w = ctx.measureText(text).width;
+          if (w < targetWidth) break;
+          size--;
+        }
+        return size;
+      }
+
       // get sampled pixel positions from text that's temporarily drawn
-      function getTextPixelCoords(text, canvasWidth, canvasHeight) {
+      function getTextPixelCoords(text, font, size, canvasWidth, canvasHeight, sampleFrequency) {
         const canvas = document.createElement("canvas");
         canvas.width = canvasWidth;
         canvas.height = canvasHeight;
         const ctx = canvas.getContext("2d");
 
         // draw centered
-        const height = 150;
         ctx.fillStyle = "white";
+        ctx.textAlign = "left";
         ctx.textBaseline = "middle";
-        ctx.textAlign = "center";
-        ctx.font = `bold ${height}px Edu NSW ACT Cursive`;
-        ctx.fillText(text, canvasWidth/2, canvasHeight/2 - height/2);
+        ctx.font = `bold ${size}px ${font}`;
+        ctx.fillText(text, 0, canvasHeight/2 - size/2);
 
         const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-        let [sampleCount, sampleInterval] = [0, 50];
+        let sampleCount = 0;
         let positions = [];
 
         for (let y = 0; y < canvas.height; y++) {
@@ -137,7 +149,7 @@
             const index = (y * canvasWidth + x) * 4;
             const isText = pixels[index + 3] > 0; // alpha is set
             sampleCount++;
-            if (isText && sampleCount % sampleInterval == 0)
+            if (isText && sampleCount % sampleFrequency == 0)
               positions.push([x, y]);
           }
         }
@@ -149,12 +161,14 @@
       // make fullscreen
       const canvas = document.getElementsByTagName("canvas")[0];
       const ctx = canvas.getContext("2d");
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = window.innerWidth * dpr;
-      canvas.height = window.innerHeight * dpr;
-      ctx.scale(dpr, dpr);
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
 
-      let positions = getTextPixelCoords("Happy 50th birthday!", window.innerWidth, window.innerHeight);
+      const [font, text] = ["Edu NSW ACT Cursive", "Happy 50th birthday!"];
+      const fontSize = getLargetFontSize(text, font, canvas.width);
+      const frequency = Math.max(10, Math.round(fontSize / 4));
+      let positions = getTextPixelCoords(
+        text, font, fontSize, canvas.width, canvas.height, frequency);
       let textParticles = positions.map((p) => new Particle(p[0], p[1], true));
 
       let explodeTextParticles = false;
