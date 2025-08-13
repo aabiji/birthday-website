@@ -115,7 +115,7 @@
       }
 
       // get the largest font size that'll fit inside the target width
-      function getLargetFontSize(text, font, targetWidth) {
+      function getLargetFontSize(ctx, text, font, targetWidth) {
         let size = targetWidth / 2;
         while (true) {
           ctx.font = `bold ${size}px ${font}`;
@@ -158,29 +158,28 @@
         return positions;
       }
 
-      // make fullscreen
-      const canvas = document.getElementsByTagName("canvas")[0];
-      const ctx = canvas.getContext("2d");
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      const setRandomInterval = (intervalFunction, minDelay, maxDelay) => {
+        let timeout;
 
-      const [font, text] = ["Edu NSW ACT Cursive", "50"];
-      const fontSize = getLargetFontSize(text, font, canvas.width);
-      const frequency = Math.max(10, Math.round(fontSize / 4));
-      let positions = getTextPixelCoords(
-        text, font, fontSize, canvas.width, canvas.height, frequency);
-      let textParticles = positions.map((p) => new Particle(p[0], p[1], true));
+        const runInterval = () => {
+          const timeoutFunction = () => {
+            intervalFunction();
+            runInterval();
+          };
 
-      let explodeTextParticles = false;
-      setTimeout(() => { explodeTextParticles = true; }, 1500);
+          const delay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
 
-      let fireworks = [];
-      setInterval(() => {
-        if (textParticles.length > 0) return;
-        fireworks.push(new Firework(random(0, canvas.width), canvas.height - 25, random(75, canvas.height / 2)));
-      }, 500);
+          timeout = setTimeout(timeoutFunction, delay);
+        };
 
-      function update(deltaTime) {
+        runInterval();
+
+        return {
+          clear() { clearTimeout(timeout) },
+        };
+      };
+
+      function update(fireworks, ctx, textParticles, deltaTime, explodeTextParticles) {
         const doneInitialExplosion = textParticles.length == 0;
         if (!doneInitialExplosion) {
           handleParticles(ctx, textParticles, deltaTime, explodeTextParticles);
@@ -193,20 +192,42 @@
         }
       }
 
-      let previousTime = 0;
-      function loop(currentTime) {
-        const deltaTime = (currentTime - previousTime) / 1000;
-        previousTime = currentTime;
+      document.fonts.ready.then(() => {
+        // make fullscreen
+        const canvas = document.getElementsByTagName("canvas")[0];
+        const ctx = canvas.getContext("2d");
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
 
-        // the slightly transparent background allows each particle's
-        // trail to be visible, like a shooting star
-        ctx.fillStyle = `rgba(0, 0, 0, 0.2)`;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        update(deltaTime);
+        const [font, text] = ["Edu NSW ACT Cursive", "50!"];
+        const fontSize = getLargetFontSize(ctx, text, font, canvas.width);
+        let positions = getTextPixelCoords(
+          text, font, fontSize, canvas.width, canvas.height, 35);
+        let textParticles = positions.map((p) => new Particle(p[0], p[1], true));
 
-        requestAnimationFrame(loop);
-      }
-      loop(0);
+        let explodeTextParticles = false;
+        setTimeout(() => { explodeTextParticles = true; }, 1500);
+
+        let fireworks = [];
+        setRandomInterval(() => {
+          if (textParticles.length > 0) return;
+          fireworks.push(new Firework(random(0, canvas.width), canvas.height - 25, random(75, canvas.height / 2)));
+        }, 1000, 2500);
+
+        function loop(currentTime, previousTime) {
+          const deltaTime = (currentTime - previousTime) / 1000;
+
+          // the slightly transparent background allows each particle's
+          // trail to be visible, like a shooting star
+          ctx.fillStyle = `rgba(0, 0, 0, 0.2)`;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          update(fireworks, ctx, textParticles, deltaTime, explodeTextParticles);
+          requestAnimationFrame((nextTime) =>
+            loop(nextTime, currentTime));
+        }
+
+        loop(0, 0, canvas);
+      });
     </script>
   </body>
 </html>
